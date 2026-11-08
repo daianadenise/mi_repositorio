@@ -1,0 +1,4 @@
+# Bloquear acceso directo a la configuración y a la conexión
+<FilesMatch "^(config|config\.example|db)\.php$">
+    Require all denied
+</FilesMatch>

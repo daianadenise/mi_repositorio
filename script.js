@@ -1,6 +1,22 @@
+// Tareas por defecto si la base de datos no está disponible (p. ej. al abrir el archivo en local)
+const TAREAS_POR_DEFECTO = [
+    "Escribir tus metas personales",
+    "Practicar meditación durante 10 minutos",
+    "Hacer ejercicio físico",
+    "Escribir 3 cosas por las que agradeces",
+].map((descripcion) => ({ id: null, descripcion, completada: false }));
 
- // Algoritmo condicional para mostrar mensaje motivacional personalizado
- function mostrarMensajeMotivacional() {
+async function api(ruta, opciones = {}) {
+    const respuesta = await fetch(`api/${ruta}`, {
+        headers: { "Content-Type": "application/json" },
+        ...opciones,
+    });
+    if (!respuesta.ok) throw new Error(`Error ${respuesta.status}`);
+    return respuesta.json();
+}
+
+// Algoritmo condicional para mostrar mensaje motivacional personalizado
+function mostrarMensajeMotivacional() {
     const estadoAnimo = document.getElementById("estadoAnimo").value;
     let mensaje = "";
 
@@ -23,20 +39,61 @@
     }
 
     document.getElementById("mensajeMotivacional").textContent = mensaje;
+
+    if (estadoAnimo) {
+        localStorage.setItem("estadoAnimo", estadoAnimo);
+        // Guardar el estado de ánimo en la base de datos
+        api("animo.php", { method: "POST", body: JSON.stringify({ estado: estadoAnimo }) })
+            .catch((error) => console.warn("No se pudo guardar el estado de ánimo:", error));
+    }
 }
 
 // Algoritmo con ciclo para crear la lista de tareas
-const tareas = [
-    "Escribir tus metas personales",
-    "Practicar meditación durante 10 minutos",
-    "Hacer ejercicio físico",
-    "Leer un libro de desarrollo personal",
-    "Escribir un diario de gratitud"
-];
+function pintarTareas(tareas) {
+    const lista = document.getElementById("listaTareas");
+    lista.innerHTML = "";
 
-const listaTareas = document.getElementById("listaTareas");
-tareas.forEach((tarea) => {
-    const li = document.createElement("li");
-    li.textContent = tarea;
-    listaTareas.appendChild(li);
-});
+    tareas.forEach((tarea) => {
+        const li = document.createElement("li");
+        const label = document.createElement("label");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = tarea.completada;
+
+        if (tarea.id !== null) {
+            checkbox.addEventListener("change", () => {
+                api("tareas.php", {
+                    method: "POST",
+                    body: JSON.stringify({ id: tarea.id, completada: checkbox.checked }),
+                }).catch((error) => {
+                    checkbox.checked = !checkbox.checked;
+                    alert("No se pudo guardar la tarea. Inténtalo de nuevo.");
+                    console.warn(error);
+                });
+            });
+        }
+
+        label.append(checkbox, " ", tarea.descripcion);
+        li.appendChild(label);
+        lista.appendChild(li);
+    });
+}
+
+async function cargarTareas() {
+    try {
+        pintarTareas(await api("tareas.php"));
+    } catch (error) {
+        console.warn("Base de datos no disponible, usando tareas por defecto:", error);
+        pintarTareas(TAREAS_POR_DEFECTO);
+        document.getElementById("estadoConexion").textContent =
+            "No se pudo conectar con la base de datos: los cambios no se guardarán.";
+    }
+}
+
+// Cargar el estado de ánimo previamente seleccionado
+const estadoAnimoGuardado = localStorage.getItem("estadoAnimo");
+if (estadoAnimoGuardado) {
+    document.getElementById("estadoAnimo").value = estadoAnimoGuardado;
+}
+
+cargarTareas();

@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  DB_NAME: ${{ secrets.HOSTINGER_DB_NAME }}
+
 jobs:
   deploy:
     name: Subir sitio por FTP
@@ -12,6 +15,20 @@ jobs:
     steps:
       - name: Obtener el código
         uses: actions/checkout@v4
+
+      - name: Crear api/config.php con los datos de MySQL
+        if: ${{ env.DB_NAME != '' }}
+        env:
+          DB_HOST: ${{ secrets.HOSTINGER_DB_HOST }}
+          DB_NAME: ${{ secrets.HOSTINGER_DB_NAME }}
+          DB_USER: ${{ secrets.HOSTINGER_DB_USER }}
+          DB_PASS: ${{ secrets.HOSTINGER_DB_PASSWORD }}
+        run: |
+          php -r '
+            $c = ["host" => getenv("DB_HOST") ?: "localhost", "database" => getenv("DB_NAME"),
+                  "username" => getenv("DB_USER"), "password" => getenv("DB_PASS")];
+            file_put_contents("api/config.php", "<?php\nreturn " . var_export($c, true) . ";\n");
+          '
 
       - name: Subir archivos a Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -27,3 +44,5 @@ jobs:
             **/.git*/**
             .github/**
             README.md
+            sql/**
+            api/config.example.php
